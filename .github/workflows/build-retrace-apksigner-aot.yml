@@ -75,7 +75,9 @@ jobs:
             --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
             --out /tmp/apktest/traced_ec.apk /tmp/apktest/unsigned.apk
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" verify /tmp/apktest/traced_rsa.apk
+            -jar "$JAR" verify -v /tmp/apktest/traced_rsa.apk
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" verify -v /tmp/apktest/traced_ec.apk
           find /tmp/apksigner-config -type f
 
       - name: Compile native-image substitutions
@@ -129,11 +131,17 @@ jobs:
           ./apksigner sign \
             --ks /tmp/apktest/ks_rsa.jks --ks-pass pass:password \
             --out /tmp/apktest/native_rsa.apk /tmp/apktest/unsigned.apk
-          ./apksigner verify /tmp/apktest/native_rsa.apk
+          ./apksigner verify -v /tmp/apktest/native_rsa.apk | tee /tmp/rsa_verify.txt
+          grep "Verified using v1 scheme (JAR signing): true" /tmp/rsa_verify.txt
+          grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/rsa_verify.txt
+          grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/rsa_verify.txt
           ./apksigner sign \
             --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
             --out /tmp/apktest/native_ec.apk /tmp/apktest/unsigned.apk
-          ./apksigner verify /tmp/apktest/native_ec.apk
+          ./apksigner verify -v /tmp/apktest/native_ec.apk | tee /tmp/ec_verify.txt
+          grep "Verified using v1 scheme (JAR signing): true" /tmp/ec_verify.txt
+          grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/ec_verify.txt
+          grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/ec_verify.txt
 
       - name: Upload aarch64 binaries
         uses: actions/upload-artifact@v4
