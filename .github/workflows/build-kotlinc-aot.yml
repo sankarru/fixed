@@ -85,6 +85,7 @@ jobs:
             -H:ConfigurationFileDirectories=/tmp/native-config \
             -H:IncludeResources='.*' \
             -H:CCompilerPath=/usr/bin/clang \
+            -H:+AllowJRTFileSystem \
             -march=compatibility \
             -J-Xmx6g \
             -H:+ReportExceptionStackTraces \
