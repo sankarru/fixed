@@ -1,0 +1,80 @@
+name: Build kotlinc AOT (aarch64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kotlin_version:
+        description: Kotlin compiler version
+        required: true
+        default: '2.4.10'
+
+jobs:
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up GraalVM + native-image
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      - name: Install clang toolchain + zlib
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang zlib1g-dev
+
+      - name: Download kotlinc
+        run: |
+          set -euxo pipefail
+          curl -fLo /tmp/kotlinc.zip \
+            "https://github.com/JetBrains/kotlin/releases/download/v${{ inputs.kotlin_version }}/kotlin-compiler-${{ inputs.kotlin_version }}.zip"
+          unzip -q /tmp/kotlinc.zip -d /tmp
+          mv /tmp/kotlin-compiler-* /tmp/kotlinc
+          ls /tmp/kotlinc/lib | head
+
+      - name: Generate native-image config (tracing agent)
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/ktwork
+          printf 'fun main() {\n  val msg = "Hello from native kotlinc"\n  println(msg)\n}\n' > /tmp/ktwork/Main.kt
+          cd /tmp/kotlinc
+          java -agentlib:native-image-agent=config-output-dir=/tmp/native-config \
+            -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/out.jar -nowarn
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/native-config \
+            -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/out2.jar -nowarn -Xjvm-default=all
+          find /tmp/native-config -type f
+
+      - name: Build kotlinc native image
+        run: |
+          set -euxo pipefail
+          cd /tmp/kotlinc
+          native-image \
+            -cp "lib/*" \
+            -H:ConfigurationFileDirectories=/tmp/native-config \
+            -H:IncludeResources='.*' \
+            -H:CCompilerPath=/usr/bin/clang \
+            -march=compatibility \
+            -J-Xmx6g \
+            -H:+ReportExceptionStackTraces \
+            -H:Name=kotlinc \
+            org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+          ls -la kotlinc
+
+      - name: Verify kotlinc compiles a program
+        run: |
+          set -euxo pipefail
+          /tmp/kotlinc/kotlinc /tmp/ktwork/Main.kt -d /tmp/ktwork/verify.jar -nowarn
+          java -cp /tmp/ktwork/verify.jar MainKt
+
+      - name: Upload aarch64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlinc-linux-aarch64
+          path: /tmp/kotlinc/kotlinc
+          if-no-files-found: error
