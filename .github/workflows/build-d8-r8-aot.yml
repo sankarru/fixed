@@ -47,8 +47,10 @@ jobs:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
         run: |
           set -euxo pipefail
+          set +o pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}"
+          set -o pipefail
 
       - name: Build d8 native image
         env:
