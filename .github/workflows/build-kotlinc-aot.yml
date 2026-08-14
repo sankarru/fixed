@@ -86,6 +86,7 @@ jobs:
             -H:IncludeResources='.*' \
             -H:CCompilerPath=/usr/bin/clang \
             -H:+AllowJRTFileSystem \
+            --future-defaults=run-time-initialize-file-system-providers \
             --initialize-at-run-time=org.jetbrains.kotlin.cli.jvm.modules \
             -march=compatibility \
             -J-Xmx6g \
