@@ -48,20 +48,17 @@ jobs:
             --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}"
           set -o pipefail
 
-      - name: Prepare test keystores and APK
+      - name: Prepare test keystores
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/apktest/apk
-          printf 'fake' > /tmp/apktest/apk/classes.dex
-          printf '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"/>' \
-            > /tmp/apktest/apk/AndroidManifest.xml
-          (cd /tmp/apktest/apk && "$JAVA_HOME/bin/jar" cfM /tmp/apktest/test.apk .)
           "$JAVA_HOME/bin/keytool" -genkeypair -alias test -keyalg RSA -keysize 2048 \
             -storetype JKS -storepass password -keypass password \
             -keystore /tmp/apktest/ks_rsa.jks -dname "CN=Test,O=Test,C=US" -validity 10000
           "$JAVA_HOME/bin/keytool" -genkeypair -alias test -keyalg EC -groupname secp256r1 \
             -storetype JKS -storepass password -keypass password \
             -keystore /tmp/apktest/ks_ec.jks -dname "CN=Test,O=Test,C=US" -validity 10000
+          mkdir -p /tmp/apktest
+          cp testdata/unsigned.apk /tmp/apktest/unsigned.apk
 
       - name: Generate apksigner native config (tracing agent)
         env:
@@ -70,15 +67,15 @@ jobs:
           set -euxo pipefail
           JAR="$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/apksigner.jar"
           java -agentlib:native-image-agent=config-output-dir=/tmp/apksigner-config \
-            -jar "$JAR" sign --min-sdk-version 26 \
+            -jar "$JAR" sign \
             --ks /tmp/apktest/ks_rsa.jks --ks-pass pass:password \
-            --out /tmp/apktest/traced_rsa.apk /tmp/apktest/test.apk
+            --out /tmp/apktest/traced_rsa.apk /tmp/apktest/unsigned.apk
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" sign --min-sdk-version 26 \
+            -jar "$JAR" sign \
             --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
-            --out /tmp/apktest/traced_ec.apk /tmp/apktest/test.apk
+            --out /tmp/apktest/traced_ec.apk /tmp/apktest/unsigned.apk
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" verify --min-sdk-version 26 /tmp/apktest/traced_rsa.apk
+            -jar "$JAR" verify /tmp/apktest/traced_rsa.apk
           find /tmp/apksigner-config -type f
 
       - name: Compile native-image substitutions
@@ -126,17 +123,17 @@ jobs:
         run: |
           ./retrace --version
 
-      - name: Verify apksigner (RSA + EC)
+      - name: Verify apksigner (RSA + EC, v1+v2+v3)
         run: |
           set -euxo pipefail
-          ./apksigner sign --min-sdk-version 26 \
+          ./apksigner sign \
             --ks /tmp/apktest/ks_rsa.jks --ks-pass pass:password \
-            --out /tmp/apktest/native_rsa.apk /tmp/apktest/test.apk
-          ./apksigner verify --min-sdk-version 26 /tmp/apktest/native_rsa.apk
-          ./apksigner sign --min-sdk-version 26 \
+            --out /tmp/apktest/native_rsa.apk /tmp/apktest/unsigned.apk
+          ./apksigner verify /tmp/apktest/native_rsa.apk
+          ./apksigner sign \
             --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
-            --out /tmp/apktest/native_ec.apk /tmp/apktest/test.apk
-          ./apksigner verify --min-sdk-version 26 /tmp/apktest/native_ec.apk
+            --out /tmp/apktest/native_ec.apk /tmp/apktest/unsigned.apk
+          ./apksigner verify /tmp/apktest/native_ec.apk
 
       - name: Upload aarch64 binaries
         uses: actions/upload-artifact@v4
