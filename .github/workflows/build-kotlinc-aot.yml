@@ -90,7 +90,7 @@ jobs:
             --future-defaults=run-time-initialize-file-system-providers \
             --initialize-at-run-time=org.jetbrains.kotlin.cli.jvm.modules \
             -march=compatibility \
-            -J-Xmx6g \
+            -J-Xmx10g \
             -H:+ReportExceptionStackTraces \
             -H:Name=kotlinc \
             org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
