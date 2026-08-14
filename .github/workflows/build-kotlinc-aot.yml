@@ -49,6 +49,25 @@ jobs:
             /tmp/ktwork/Main.kt -d /tmp/ktwork/out2.jar -nowarn -Xjvm-default=all
           find /tmp/native-config -type f
 
+      - name: Strip broken jline native-image config
+        run: |
+          set -euxo pipefail
+          python3 - <<'EOF'
+import zipfile, os
+jar = "/tmp/kotlinc/lib/kotlin-compiler.jar"
+dst = jar + ".fixed"
+zin = zipfile.ZipFile(jar, "r")
+zout = zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED)
+for item in zin.infolist():
+    if "META-INF/native-image" in item.filename:
+        continue
+    zout.writestr(item, zin.read(item.filename))
+zout.close()
+zin.close()
+os.replace(dst, jar)
+EOF
+          echo "stripped"
+
       - name: Build kotlinc native image
         run: |
           set -euxo pipefail
