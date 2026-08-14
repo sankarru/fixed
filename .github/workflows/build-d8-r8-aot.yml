@@ -61,6 +61,7 @@ jobs:
             -cp "$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/d8.jar" \
             --initialize-at-build-time \
             -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:IncludeResources="resources/new_api_database.ser" \
             -H:CCompilerPath=/usr/bin/clang \
             -march=compatibility \
             -H:Name=d8 \
@@ -75,6 +76,7 @@ jobs:
             -cp "$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar" \
             --initialize-at-build-time \
             -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:IncludeResources="resources/new_api_database.ser" \
             -H:CCompilerPath=/usr/bin/clang \
             -march=compatibility \
             -H:Name=r8 \
