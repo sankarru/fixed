@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euxo pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}" > /dev/null
+            --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}"
 
       - name: Build d8 native image
         env:
