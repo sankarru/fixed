@@ -87,7 +87,8 @@ jobs:
       - name: Verify kotlinc compiles a program
         run: |
           set -euxo pipefail
-          /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc /tmp/ktwork/Main.kt -d /tmp/ktwork/verify.jar -nowarn
+          /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/verify.jar -nowarn
           java -cp /tmp/ktwork/verify.jar MainKt
 
       - name: Upload aarch64 binary
