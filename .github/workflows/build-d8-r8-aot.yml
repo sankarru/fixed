@@ -62,6 +62,7 @@ jobs:
             --initialize-at-build-time \
             -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
             -H:CCompilerPath=/usr/bin/clang \
+            -march=compatibility \
             -H:Name=d8 \
             com.android.tools.r8.D8
 
@@ -75,6 +76,7 @@ jobs:
             --initialize-at-build-time \
             -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
             -H:CCompilerPath=/usr/bin/clang \
+            -march=compatibility \
             -H:Name=r8 \
             com.android.tools.r8.R8
 
