@@ -33,7 +33,6 @@ jobs:
           curl -fLo /tmp/kotlinc.zip \
             "https://github.com/JetBrains/kotlin/releases/download/v${{ inputs.kotlin_version }}/kotlin-compiler-${{ inputs.kotlin_version }}.zip"
           unzip -q /tmp/kotlinc.zip -d /tmp
-          mv /tmp/kotlin-compiler-* /tmp/kotlinc
           ls /tmp/kotlinc/lib | head
 
       - name: Generate native-image config (tracing agent)
