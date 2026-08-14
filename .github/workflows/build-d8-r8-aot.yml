@@ -1,0 +1,91 @@
+name: Build D8/R8 AOT (aarch64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_tools_version:
+        description: Android build-tools version providing d8.jar
+        required: true
+        default: '37.0.0'
+      graalvm_version:
+        description: GraalVM JDK version (LTS)
+        required: true
+        default: '25'
+
+jobs:
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up GraalVM + native-image
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: ${{ inputs.graalvm_version }}
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      - name: Install clang toolchain + zlib
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang zlib1g-dev
+
+      - name: Download Android command line tools
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          curl -fLo /tmp/cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+
+      - name: Install build-tools (provides d8.jar)
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}" > /dev/null
+
+      - name: Build d8 native image
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          native-image \
+            -cp "$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/d8.jar" \
+            --initialize-at-build-time \
+            -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:CCompilerPath=/usr/bin/clang \
+            -H:Name=d8 \
+            com.android.tools.r8.D8
+
+      - name: Build r8 native image
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          native-image \
+            -cp "$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar" \
+            --initialize-at-build-time \
+            -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:CCompilerPath=/usr/bin/clang \
+            -H:Name=r8 \
+            com.android.tools.r8.R8
+
+      - name: Verify binaries
+        run: |
+          ./d8 --version
+          ./r8 --version
+
+      - name: Upload aarch64 binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: d8-r8-linux-aarch64
+          path: |
+            d8
+            r8
+          if-no-files-found: error

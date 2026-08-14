@@ -1,0 +1,10 @@
+[
+  {
+    "name": "com.android.tools.r8.threading.providers.blocking.ThreadingModuleBlockingProvider",
+    "methods": [{ "name": "<init>", "parameterTypes": [] }]
+  },
+  {
+    "name": "com.android.tools.r8.threading.providers.singlethreaded.ThreadingModuleSingleThreadedProvider",
+    "methods": [{ "name": "<init>", "parameterTypes": [] }]
+  }
+]
