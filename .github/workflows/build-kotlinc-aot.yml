@@ -86,7 +86,7 @@ jobs:
             -H:IncludeResources='.*' \
             -H:CCompilerPath=/usr/bin/clang \
             -H:+AllowJRTFileSystem \
-            --initialize-at-build-time=jdk.internal.jimage \
+            --initialize-at-build-time=jdk.internal.jimage.ImageReader,jdk.internal.jimage.ImageReader\$SharedImageReader,jdk.internal.jimage.ImageReader\$Directory,jdk.internal.jimage.ImageReader\$LinkNode,jdk.internal.jimage.ImageReader\$Node,jdk.internal.jimage.ImageReader\$Resource,jdk.internal.jimage.ImageReader\$SharedImageReader\$LocationVisitor,jdk.internal.jimage.BasicImageReader,jdk.internal.jimage.ImageBufferCache,jdk.internal.jimage.ImageHeader,jdk.internal.jimage.ImageLocation,jdk.internal.jimage.ImageStream,jdk.internal.jimage.ImageStrings,jdk.internal.jimage.ImageStringsReader,jdk.internal.jimage.NativeImageBuffer,jdk.internal.jimage.ImageReaderFactory \
             -march=compatibility \
             -J-Xmx6g \
             -H:+ReportExceptionStackTraces \

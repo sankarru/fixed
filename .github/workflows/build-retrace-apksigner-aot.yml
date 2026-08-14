@@ -51,14 +51,14 @@ jobs:
       - name: Prepare test keystores
         run: |
           set -euxo pipefail
+          mkdir -p /tmp/apktest
+          cp testdata/unsigned.apk /tmp/apktest/unsigned.apk
           "$JAVA_HOME/bin/keytool" -genkeypair -alias test -keyalg RSA -keysize 2048 \
             -storetype JKS -storepass password -keypass password \
             -keystore /tmp/apktest/ks_rsa.jks -dname "CN=Test,O=Test,C=US" -validity 10000
           "$JAVA_HOME/bin/keytool" -genkeypair -alias test -keyalg EC -groupname secp256r1 \
             -storetype JKS -storepass password -keypass password \
             -keystore /tmp/apktest/ks_ec.jks -dname "CN=Test,O=Test,C=US" -validity 10000
-          mkdir -p /tmp/apktest
-          cp testdata/unsigned.apk /tmp/apktest/unsigned.apk
 
       - name: Generate apksigner native config (tracing agent)
         env:
