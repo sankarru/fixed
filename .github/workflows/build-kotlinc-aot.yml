@@ -86,6 +86,7 @@ jobs:
             -H:IncludeResources='.*' \
             -H:CCompilerPath=/usr/bin/clang \
             -H:+AllowJRTFileSystem \
+            --initialize-at-build-time=jdk.internal.jimage.ImageReader \
             -march=compatibility \
             -J-Xmx6g \
             -H:+ReportExceptionStackTraces \
