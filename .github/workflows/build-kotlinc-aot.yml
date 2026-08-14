@@ -68,12 +68,20 @@ jobs:
           EOF
           echo "stripped"
 
+      - name: Compile PathUtil substitution
+        run: |
+          set -euxo pipefail
+          "$JAVA_HOME/bin/jmod" extract --dir /tmp/ni-mod "$JAVA_HOME/jmods/org.graalvm.nativeimage.jmod"
+          mkdir -p /tmp/subst-classes
+          javac -cp /tmp/ni-mod/classes -d /tmp/subst-classes \
+            kotlinc-native/PathUtilSubstitution.java
+
       - name: Build kotlinc native image
         run: |
           set -euxo pipefail
           cd /tmp/kotlinc
           native-image \
-            -cp "lib/*" \
+            -cp "lib/*:/tmp/subst-classes" \
             -H:ConfigurationFileDirectories=/tmp/native-config \
             -H:IncludeResources='.*' \
             -H:CCompilerPath=/usr/bin/clang \
