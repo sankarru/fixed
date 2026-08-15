@@ -171,6 +171,7 @@ jobs:
           ANDROID_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
           mkdir -p /tmp/vt && cd /tmp/vt
           cp /tmp/d8test/Hello.java /tmp/d8test/keep.txt .
+          mkdir -p dex1 dex2 r8out r8cf r8out2
 
           ./d8 --version
           ./d8 --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes
