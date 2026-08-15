@@ -69,7 +69,7 @@ jobs:
               }
           }
           EOF
-          "$JAVA_HOME/bin/javac" -proc:none -d /tmp/d8test/classes /tmp/d8test/Hello.java
+          "$JAVA_HOME/bin/javac" -proc:none --release 17 -d /tmp/d8test/classes /tmp/d8test/Hello.java
           cd /tmp/d8test
           jar cf classes.jar -C classes .
           cat > /tmp/d8test/keep.txt <<'EOF'
