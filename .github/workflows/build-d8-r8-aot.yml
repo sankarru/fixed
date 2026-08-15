@@ -70,6 +70,8 @@ jobs:
           }
           EOF
           "$JAVA_HOME/bin/javac" -proc:none -d /tmp/d8test/classes /tmp/d8test/Hello.java
+          cd /tmp/d8test
+          jar cf classes.jar -C classes .
           cat > /tmp/d8test/keep.txt <<'EOF'
           -keep public class com.example.hello.Hello { *; }
           -dontwarn
@@ -96,36 +98,36 @@ jobs:
           # d8: release dex
           java -agentlib:native-image-agent=config-output-dir=/tmp/d8r8-config \
             -cp "$D8JAR" com.android.tools.r8.D8 \
-            --release --lib "$ANDROID_JAR" --min-api 26 --output out1 /tmp/d8test/classes
+            --release --lib "$ANDROID_JAR" --min-api 26 --output out1 /tmp/d8test/classes.jar
           # d8: debug + older min-api
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$D8JAR" com.android.tools.r8.D8 \
-            --debug --lib "$ANDROID_JAR" --min-api 21 --output out2 /tmp/d8test/classes
+            --debug --lib "$ANDROID_JAR" --min-api 21 --output out2 /tmp/d8test/classes.jar
           # d8: intermediate + thread-count
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$D8JAR" com.android.tools.r8.D8 \
-            --release --lib "$ANDROID_JAR" --min-api 26 --intermediate --thread-count 2 --output out3 /tmp/d8test/classes
+            --release --lib "$ANDROID_JAR" --min-api 26 --intermediate --thread-count 2 --output out3 /tmp/d8test/classes.jar
 
           # r8: release shrink with map output
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf /tmp/d8test/keep.txt \
-            --pg-map-output /tmp/d8r8-scratch/map.txt --output r8out1 /tmp/d8test/classes
+            --pg-map-output /tmp/d8r8-scratch/map.txt --output r8out1 /tmp/d8test/classes.jar
           # r8: debug + older min-api
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf /tmp/d8test/keep.txt \
-            --output r8out2 /tmp/d8test/classes
+            --output r8out2 /tmp/d8test/classes.jar
           # r8: classfile mode (no dex)
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --release --classfile --lib "$ANDROID_JAR" --pg-conf /tmp/d8test/keep.txt \
-            --output r8cf /tmp/d8test/classes
+            --output r8cf /tmp/d8test/classes.jar
           # r8: printseeds + thread-count + no-tree-shaking
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf /tmp/d8test/keep.txt \
-            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out3 /tmp/d8test/classes
+            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out3 /tmp/d8test/classes.jar
           # r8: version + help (common metadata paths)
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 --version
@@ -174,26 +176,26 @@ jobs:
           mkdir -p dex1 dex2 r8out r8cf r8out2
 
           ./d8 --version
-          ./d8 --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes
+          ./d8 --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes.jar
           test -s dex1/classes.dex
           echo "PASS: d8 dex"
 
-          ./d8 --debug --lib "$ANDROID_JAR" --min-api 21 --thread-count 2 --output dex2 /tmp/d8test/classes
+          ./d8 --debug --lib "$ANDROID_JAR" --min-api 21 --thread-count 2 --output dex2 /tmp/d8test/classes.jar
           test -s dex2/classes.dex
           echo "PASS: d8 debug dex"
 
           ./r8 --version
           ./r8 --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf keep.txt \
-            --pg-map-output map.txt --output r8out /tmp/d8test/classes
+            --pg-map-output map.txt --output r8out /tmp/d8test/classes.jar
           test -s r8out/classes.dex && test -s map.txt
           echo "PASS: r8 shrink + mapping"
 
-          ./r8 --release --classfile --lib "$ANDROID_JAR" --pg-conf keep.txt --output r8cf /tmp/d8test/classes
+          ./r8 --release --classfile --lib "$ANDROID_JAR" --pg-conf keep.txt --output r8cf /tmp/d8test/classes.jar
           test -d r8cf
           echo "PASS: r8 classfile mode"
 
           ./r8 --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf keep.txt \
-            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes
+            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes.jar
           test -s r8out2/classes.dex
           echo "PASS: r8 debug + printseeds"
 
