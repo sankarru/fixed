@@ -186,49 +186,50 @@ jobs:
       - name: Verify apksigner (RSA + EC + DSA, v1+v2+v3+v4, multi-signer)
         run: |
           set -euxo pipefail
+          APKSIGNER="$GITHUB_WORKSPACE/apksigner"
           cd /tmp/apktest
-          ./apksigner --version
+          "$APKSIGNER" --version
 
-          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_rsa.jks --ks-pass pass:password \
             --out native_rsa.apk unsigned.apk
-          ./apksigner verify -v --print-certs native_rsa.apk | tee /tmp/rsa_verify.txt
+          "$APKSIGNER" verify -v --print-certs native_rsa.apk | tee /tmp/rsa_verify.txt
           grep "Verified using v1 scheme (JAR signing): true" /tmp/rsa_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/rsa_verify.txt
           grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/rsa_verify.txt
           echo "PASS: RSA v1+v2+v3"
 
-          ./apksigner sign --ks ks_ec.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_ec.jks --ks-pass pass:password \
             --out native_ec.apk unsigned.apk
-          ./apksigner verify -v native_ec.apk | tee /tmp/ec_verify.txt
+          "$APKSIGNER" verify -v native_ec.apk | tee /tmp/ec_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/ec_verify.txt
           grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/ec_verify.txt
           echo "PASS: EC v1+v2+v3"
 
-          ./apksigner sign --ks ks_dsa.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_dsa.jks --ks-pass pass:password \
             --out native_dsa.apk unsigned.apk
-          ./apksigner verify -v native_dsa.apk | tee /tmp/dsa_verify.txt
+          "$APKSIGNER" verify -v native_dsa.apk | tee /tmp/dsa_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/dsa_verify.txt
           echo "PASS: DSA"
 
-          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_rsa.jks --ks-pass pass:password \
             --v4-signing-enabled true --out native_v4.apk unsigned.apk
           test -s native_v4.apk.idsig
-          ./apksigner verify -v native_v4.apk | tee /tmp/v4_verify.txt
+          "$APKSIGNER" verify -v native_v4.apk | tee /tmp/v4_verify.txt
           grep "Verifies" /tmp/v4_verify.txt
           echo "PASS: v4 idsig produced (minSdk 26 => v4 verify reports false by design)"
 
-          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_rsa.jks --ks-pass pass:password \
             --v2-signing-enabled false --v3-signing-enabled false --v4-signing-enabled false \
             --min-sdk-version 19 --out native_v1only.apk unsigned.apk
-          ./apksigner verify -v native_v1only.apk | tee /tmp/v1_verify.txt
+          "$APKSIGNER" verify -v native_v1only.apk | tee /tmp/v1_verify.txt
           grep "Verified using v1 scheme (JAR signing): true" /tmp/v1_verify.txt
           echo "PASS: v1-only old min-sdk"
 
-          ./apksigner sign --ks ks_rsa2.jks --ks-pass pass:password \
+          "$APKSIGNER" sign --ks ks_rsa2.jks --ks-pass pass:password \
             --v3-signing-enabled false \
             --next-signer --ks ks_ec2.jks --ks-pass pass:password \
             --out native_multi.apk unsigned.apk
-          ./apksigner verify -v --print-certs native_multi.apk | tee /tmp/multi_verify.txt
+          "$APKSIGNER" verify -v --print-certs native_multi.apk | tee /tmp/multi_verify.txt
           grep "Number of signers: 2" /tmp/multi_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/multi_verify.txt
           echo "PASS: multiple signers"

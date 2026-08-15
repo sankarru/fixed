@@ -91,6 +91,7 @@ jobs:
           fi
           mkdir -p /tmp/d8r8-config /tmp/d8r8-scratch
           cd /tmp/d8r8-scratch
+          mkdir -p out1 out2 out3 r8out1 r8out2 r8out3 r8cf
 
           # d8: release dex
           java -agentlib:native-image-agent=config-output-dir=/tmp/d8r8-config \
