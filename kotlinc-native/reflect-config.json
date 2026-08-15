@@ -1,0 +1,96 @@
+[
+  {
+    "type": "org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments",
+    "methods": [
+      {
+        "name": "setClasspath",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      },
+      {
+        "name": "setIncludeRuntime",
+        "parameterTypes": [
+          "boolean"
+        ]
+      },
+      {
+        "name": "setJvmTarget",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      },
+      {
+        "name": "setModuleName",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      },
+      {
+        "name": "setNoReflect",
+        "parameterTypes": [
+          "boolean"
+        ]
+      },
+      {
+        "name": "setNoStdlib",
+        "parameterTypes": [
+          "boolean"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments",
+    "methods": [
+      {
+        "name": "setPluginClasspaths",
+        "parameterTypes": [
+          "java.lang.String[]"
+        ]
+      },
+      {
+        "name": "setPluginOptions",
+        "parameterTypes": [
+          "java.lang.String[]"
+        ]
+      },
+      {
+        "name": "setPluginConfigurations",
+        "parameterTypes": [
+          "java.lang.String[]"
+        ]
+      },
+      {
+        "name": "setPluginOrderConstraints",
+        "parameterTypes": [
+          "java.lang.String[]"
+        ]
+      },
+      {
+        "name": "setMultiPlatform",
+        "parameterTypes": [
+          "boolean"
+        ]
+      },
+      {
+        "name": "setApiVersion",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      },
+      {
+        "name": "setLanguageVersion",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      },
+      {
+        "name": "setProgressiveMode",
+        "parameterTypes": [
+          "boolean"
+        ]
+      }
+    ]
+  }
+]

@@ -35,19 +35,81 @@ jobs:
           unzip -q /tmp/kotlinc.zip -d /tmp
           ls /tmp/kotlinc/lib | head
 
-      - name: Generate native-image config (tracing agent)
+      - name: Download Compose runtime for compile-classpath tracing
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/ktwork
+          curl -fLo /tmp/crt.aar \
+            "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.11.1/runtime-android-1.11.1.aar"
+          mkdir -p /tmp/crt && cd /tmp/crt
+          unzip -o -q /tmp/crt.aar classes.jar
+          mv classes.jar /tmp/compose-runtime.jar
+          ls -la /tmp/compose-runtime.jar
+
+      - name: Generate native-image config (tracing agent, all feature paths)
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/ktwork /tmp/native-config
+
           printf 'fun main() {\n  val msg = "Hello from native kotlinc"\n  println(msg)\n}\n' > /tmp/ktwork/Main.kt
+
+          printf 'package samplelib\nfun helper(): String = "hi"\n' > /tmp/ktwork/Helper.kt
+
+          cat > /tmp/ktwork/Compose.kt <<'EOF'
+          package com.example.sample
+
+          import androidx.compose.runtime.Composable
+
+          @Composable
+          fun GreetingMessage(title: String): String {
+              return "Hello from AOT Compose: $title"
+          }
+
+          @Composable
+          fun render() {
+              println(GreetingMessage("world"))
+          }
+          EOF
+
           cd /tmp/kotlinc
+
+          # 1. plain compile (stdlib only)
           java -agentlib:native-image-agent=config-output-dir=/tmp/native-config \
             -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
             /tmp/ktwork/Main.kt -d /tmp/ktwork/out.jar -nowarn
+
+          # 2. compile with a user classpath (setClasspath) + source from jar
           java -agentlib:native-image-agent=config-merge-dir=/tmp/native-config \
             -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
-            /tmp/ktwork/Main.kt -d /tmp/ktwork/out2.jar -nowarn -Xjvm-default=all
+            -cp /tmp/compose-runtime.jar -d /tmp/ktwork/out2.jar \
+            /tmp/ktwork/Compose.kt -nowarn
+
+          # 3. compose plugin explicitly enabled with options (setPluginClasspaths/setPluginOptions)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/native-config \
+            -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+            -cp /tmp/compose-runtime.jar \
+            -Xplugin=lib/compose-compiler-plugin.jar \
+            -P plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true \
+            -d /tmp/ktwork/out3.jar /tmp/ktwork/Compose.kt -nowarn
+
+          # 4. self-contained runnable jar (setIncludeRuntime)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/native-config \
+            -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/out4.jar -include-runtime -nowarn
+
+          # 5. language/api version + jvm-target + module name + mpp + progressive
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/native-config \
+            -cp "lib/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+            -language-version 2.4 -api-version 2.4 -jvm-target 17 \
+            -module-name samplemod -Xmulti-platform -progressive \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/out5.jar -nowarn
+
           find /tmp/native-config -type f
+
+      - name: Add handwritten reflection config (guaranteed arg coverage)
+        run: |
+          set -euxo pipefail
+          cp kotlinc-native/reflect-config.json /tmp/native-config/reflect-config.json
+          cat /tmp/native-config/reflect-config.json
 
       - name: Strip broken jline native-image config
         run: |
@@ -96,12 +158,35 @@ jobs:
             org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
           ls -la kotlinc
 
-      - name: Verify kotlinc compiles a program
+      - name: Verify plain compile + run
         run: |
           set -euxo pipefail
           /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
             /tmp/ktwork/Main.kt -d /tmp/ktwork/verify.jar -nowarn
           java -cp /tmp/ktwork/verify.jar MainKt
+
+      - name: Verify runnable jar (-include-runtime)
+        run: |
+          set -euxo pipefail
+          /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
+            /tmp/ktwork/Main.kt -d /tmp/ktwork/verify-runnable.jar -include-runtime -nowarn
+          java -jar /tmp/ktwork/verify-runnable.jar
+
+      - name: Verify Compose compilation with the native binary
+        run: |
+          set -euxo pipefail
+          /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
+            -cp /tmp/compose-runtime.jar -d /tmp/ktwork/verify-compose.jar \
+            /tmp/ktwork/Compose.kt -nowarn
+          if "$JAVA_HOME/bin/javap" -classpath /tmp/ktwork/verify-compose.jar -p \
+              com.example.sample.ComposeKt | grep -q Composer; then
+            echo "PASS: composable transformed (Composer injected)"
+          else
+            echo "FAIL: @Composable not transformed by compose compiler plugin"
+            "$JAVA_HOME/bin/javap" -classpath /tmp/ktwork/verify-compose.jar -p \
+              com.example.sample.ComposeKt || true
+            exit 1
+          fi
 
       - name: Check no build-time java.home is baked
         run: |
