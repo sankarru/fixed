@@ -31,22 +31,26 @@ jobs:
           unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
           mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
 
-      - name: Install SDK platform 36 + build-tools
+      - name: Install SDK platform 36 + build-tools (37.0.0 has aarch64 aapt2)
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
         run: |
           set -euxo pipefail
           set +o pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;36.0.0"
+            --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;37.0.0"
           set -o pipefail
+          "$ANDROID_HOME/build-tools/37.0.0/aapt2" version
 
       - name: Build APKs (debug + release)
         working-directory: apps/logviewer
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
           ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
-        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon
+        run: |
+          set -euxo pipefail
+          ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon \
+            -Pandroid.aapt2FromMavenOverride="$ANDROID_HOME/build-tools/37.0.0/aapt2"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
