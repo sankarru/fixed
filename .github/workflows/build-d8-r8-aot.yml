@@ -175,26 +175,28 @@ jobs:
           cp /tmp/d8test/Hello.java /tmp/d8test/keep.txt .
           mkdir -p dex1 dex2 r8out r8cf r8out2
 
-          ./d8 --version
-          ./d8 --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes.jar
+          D8="$GITHUB_WORKSPACE/d8"
+          R8="$GITHUB_WORKSPACE/r8"
+          "$D8" --version
+          "$D8" --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes.jar
           test -s dex1/classes.dex
           echo "PASS: d8 dex"
 
-          ./d8 --debug --lib "$ANDROID_JAR" --min-api 21 --thread-count 2 --output dex2 /tmp/d8test/classes.jar
+          "$D8" --debug --lib "$ANDROID_JAR" --min-api 21 --thread-count 2 --output dex2 /tmp/d8test/classes.jar
           test -s dex2/classes.dex
           echo "PASS: d8 debug dex"
 
-          ./r8 --version
-          ./r8 --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf keep.txt \
+          "$R8" --version
+          "$R8" --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf keep.txt \
             --pg-map-output map.txt --output r8out /tmp/d8test/classes.jar
           test -s r8out/classes.dex && test -s map.txt
           echo "PASS: r8 shrink + mapping"
 
-          ./r8 --release --classfile --lib "$ANDROID_JAR" --pg-conf keep.txt --output r8cf /tmp/d8test/classes.jar
+          "$R8" --release --classfile --lib "$ANDROID_JAR" --pg-conf keep.txt --output r8cf /tmp/d8test/classes.jar
           test -d r8cf
           echo "PASS: r8 classfile mode"
 
-          ./r8 --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf keep.txt \
+          "$R8" --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf keep.txt \
             --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes.jar
           test -s r8out2/classes.dex
           echo "PASS: r8 debug + thread-count"
