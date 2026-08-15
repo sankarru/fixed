@@ -88,7 +88,7 @@ jobs:
             -H:+AllowJRTFileSystem \
             -H:+AddAllCharsets \
             --future-defaults=run-time-initialize-file-system-providers \
-            --initialize-at-run-time=org.jetbrains.kotlin,com.intellij,org.fusesource \
+            --initialize-at-run-time=org.jetbrains.kotlin,com.intellij,org.fusesource,jdk.internal.jrtfs,jdk.internal.jimage \
             -march=compatibility \
             -J-Xmx10g \
             -H:+ReportExceptionStackTraces \
