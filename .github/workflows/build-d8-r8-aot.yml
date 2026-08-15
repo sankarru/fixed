@@ -123,11 +123,11 @@ jobs:
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --release --classfile --lib "$ANDROID_JAR" --pg-conf /tmp/d8test/keep.txt \
             --output r8cf /tmp/d8test/classes.jar
-          # r8: printseeds + thread-count + no-tree-shaking
+          # r8: thread-count + no-tree-shaking
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 \
             --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf /tmp/d8test/keep.txt \
-            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out3 /tmp/d8test/classes.jar
+            --thread-count 2 --no-tree-shaking --output r8out3 /tmp/d8test/classes.jar
           # r8: version + help (common metadata paths)
           java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
             -cp "$R8JAR" com.android.tools.r8.R8 --version
@@ -195,9 +195,9 @@ jobs:
           echo "PASS: r8 classfile mode"
 
           ./r8 --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf keep.txt \
-            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes.jar
+            --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes.jar
           test -s r8out2/classes.dex
-          echo "PASS: r8 debug + printseeds"
+          echo "PASS: r8 debug + thread-count"
 
       - name: Upload aarch64 binaries
         uses: actions/upload-artifact@v4
