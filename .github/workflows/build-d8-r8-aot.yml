@@ -52,6 +52,84 @@ jobs:
             --sdk_root="$ANDROID_HOME" "build-tools;${{ inputs.build_tools_version }}"
           set -o pipefail
 
+      - name: Prepare test class + keep rules
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/d8test/classes
+          cat > /tmp/d8test/Hello.java <<'EOF'
+          package com.example.hello;
+          import java.util.List;
+          import java.util.stream.Collectors;
+          public class Hello {
+              public static String greet(List<String> names) {
+                  return names.stream().map(String::toUpperCase).collect(Collectors.joining(", "));
+              }
+              public static void main(String[] a) {
+                  System.out.println("Hello " + greet(List.of("a", "b")));
+              }
+          }
+          EOF
+          "$JAVA_HOME/bin/javac" -proc:none -d /tmp/d8test/classes /tmp/d8test/Hello.java
+          cat > /tmp/d8test/keep.txt <<'EOF'
+          -keep public class com.example.hello.Hello { *; }
+          -dontwarn
+          EOF
+
+      - name: Generate d8/r8 native config (tracing agent, comprehensive)
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          D8JAR="$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/d8.jar"
+          R8JAR="$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar"
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
+          if [ ! -f "$ANDROID_JAR" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+              --sdk_root="$ANDROID_HOME" "platforms;android-36"
+          fi
+          mkdir -p /tmp/d8r8-config /tmp/d8r8-scratch
+          cd /tmp/d8r8-scratch
+
+          # d8: release dex
+          java -agentlib:native-image-agent=config-output-dir=/tmp/d8r8-config \
+            -cp "$D8JAR" com.android.tools.r8.D8 \
+            --release --lib "$ANDROID_JAR" --min-api 26 --output out1 /tmp/d8test/classes
+          # d8: debug + older min-api
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$D8JAR" com.android.tools.r8.D8 \
+            --debug --lib "$ANDROID_JAR" --min-api 21 --output out2 /tmp/d8test/classes
+          # d8: intermediate + thread-count
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$D8JAR" com.android.tools.r8.D8 \
+            --release --lib "$ANDROID_JAR" --min-api 26 --intermediate --thread-count 2 --output out3 /tmp/d8test/classes
+
+          # r8: release shrink with map output
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 \
+            --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf /tmp/d8test/keep.txt \
+            --pg-map-output /tmp/d8r8-scratch/map.txt --output r8out1 /tmp/d8test/classes
+          # r8: debug + older min-api
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 \
+            --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf /tmp/d8test/keep.txt \
+            --output r8out2 /tmp/d8test/classes
+          # r8: classfile mode (no dex)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 \
+            --release --classfile --lib "$ANDROID_JAR" --pg-conf /tmp/d8test/keep.txt \
+            --output r8cf /tmp/d8test/classes
+          # r8: printseeds + thread-count + no-tree-shaking
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 \
+            --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf /tmp/d8test/keep.txt \
+            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out3 /tmp/d8test/classes
+          # r8: version + help (common metadata paths)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 --version
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/d8r8-config \
+            -cp "$R8JAR" com.android.tools.r8.R8 --help > /dev/null 2>&1 || true
+          find /tmp/d8r8-config -type f
+
       - name: Build d8 native image
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
@@ -60,7 +138,7 @@ jobs:
           native-image \
             -cp "$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/d8.jar" \
             --initialize-at-build-time \
-            -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:ConfigurationFileDirectories=/tmp/d8r8-config \
             -H:IncludeResources="resources/new_api_database.ser" \
             -H:CCompilerPath=/usr/bin/clang \
             -march=compatibility \
@@ -75,17 +153,45 @@ jobs:
           native-image \
             -cp "$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar" \
             --initialize-at-build-time \
-            -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:ConfigurationFileDirectories=/tmp/d8r8-config \
             -H:IncludeResources="resources/new_api_database.ser" \
             -H:CCompilerPath=/usr/bin/clang \
             -march=compatibility \
             -H:Name=r8 \
             com.android.tools.r8.R8
 
-      - name: Verify binaries
+      - name: Verify d8/r8 functionality
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
         run: |
+          set -euxo pipefail
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
+          mkdir -p /tmp/vt && cd /tmp/vt
+          cp /tmp/d8test/Hello.java /tmp/d8test/keep.txt .
+
           ./d8 --version
+          ./d8 --release --lib "$ANDROID_JAR" --min-api 26 --output dex1 /tmp/d8test/classes
+          test -s dex1/classes.dex
+          echo "PASS: d8 dex"
+
+          ./d8 --debug --lib "$ANDROID_JAR" --min-api 21 --thread-count 2 --output dex2 /tmp/d8test/classes
+          test -s dex2/classes.dex
+          echo "PASS: d8 debug dex"
+
           ./r8 --version
+          ./r8 --release --lib "$ANDROID_JAR" --min-api 26 --pg-conf keep.txt \
+            --pg-map-output map.txt --output r8out /tmp/d8test/classes
+          test -s r8out/classes.dex && test -s map.txt
+          echo "PASS: r8 shrink + mapping"
+
+          ./r8 --release --classfile --lib "$ANDROID_JAR" --pg-conf keep.txt --output r8cf /tmp/d8test/classes
+          test -d r8cf
+          echo "PASS: r8 classfile mode"
+
+          ./r8 --debug --lib "$ANDROID_JAR" --min-api 21 --pg-conf keep.txt \
+            --printseeds seeds.txt --thread-count 2 --no-tree-shaking --output r8out2 /tmp/d8test/classes
+          test -s r8out2/classes.dex
+          echo "PASS: r8 debug + printseeds"
 
       - name: Upload aarch64 binaries
         uses: actions/upload-artifact@v4

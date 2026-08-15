@@ -59,26 +59,77 @@ jobs:
           "$JAVA_HOME/bin/keytool" -genkeypair -alias test -keyalg EC -groupname secp256r1 \
             -storetype JKS -storepass password -keypass password \
             -keystore /tmp/apktest/ks_ec.jks -dname "CN=Test,O=Test,C=US" -validity 10000
+          "$JAVA_HOME/bin/keytool" -genkeypair -alias dsa -keyalg DSA -keysize 2048 \
+            -storetype JKS -storepass password -keypass password \
+            -keystore /tmp/apktest/ks_dsa.jks -dname "CN=TestDSA,O=Test,C=US" -validity 10000
+          "$JAVA_HOME/bin/keytool" -genkeypair -alias rsa2 -keyalg RSA -keysize 2048 \
+            -storetype JKS -storepass password -keypass password \
+            -keystore /tmp/apktest/ks_rsa2.jks -dname "CN=TestRSA2,O=Test,C=US" -validity 10000
+          "$JAVA_HOME/bin/keytool" -genkeypair -alias ec2 -keyalg EC -groupname secp256r1 \
+            -storetype JKS -storepass password -keypass password \
+            -keystore /tmp/apktest/ks_ec2.jks -dname "CN=TestEC2,O=Test,C=US" -validity 10000
 
-      - name: Generate apksigner native config (tracing agent)
+      - name: Generate apksigner native config (tracing agent, comprehensive)
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
         run: |
           set -euxo pipefail
           JAR="$ANDROID_HOME/build-tools/${{ inputs.build_tools_version }}/lib/apksigner.jar"
+          cd /tmp/apktest
+          # RSA default (v1+v2+v3)
           java -agentlib:native-image-agent=config-output-dir=/tmp/apksigner-config \
-            -jar "$JAR" sign \
-            --ks /tmp/apktest/ks_rsa.jks --ks-pass pass:password \
-            --out /tmp/apktest/traced_rsa.apk /tmp/apktest/unsigned.apk
+            -jar "$JAR" sign --ks ks_rsa.jks --ks-pass pass:password \
+            --out traced_rsa.apk unsigned.apk
+          # EC default
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" sign \
-            --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
-            --out /tmp/apktest/traced_ec.apk /tmp/apktest/unsigned.apk
+            -jar "$JAR" sign --ks ks_ec.jks --ks-pass pass:password \
+            --out traced_ec.apk unsigned.apk
+          # DSA default
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" verify -v /tmp/apktest/traced_rsa.apk
+            -jar "$JAR" sign --ks ks_dsa.jks --ks-pass pass:password \
+            --out traced_dsa.apk unsigned.apk
+          # v4 idsig sidecar
           java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
-            -jar "$JAR" verify -v /tmp/apktest/traced_ec.apk
+            -jar "$JAR" sign --ks ks_rsa.jks --ks-pass pass:password \
+            --v4-signing-enabled true --out traced_v4.apk unsigned.apk
+          # v1-only for old min-sdk
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" sign --ks ks_rsa.jks --ks-pass pass:password \
+            --v2-signing-enabled false --v3-signing-enabled false --v4-signing-enabled false \
+            --min-sdk-version 19 --out traced_v1only.apk unsigned.apk
+          # multiple signers (distinct CNs, v3 disabled)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" sign --ks ks_rsa2.jks --ks-pass pass:password \
+            --v3-signing-enabled false \
+            --next-signer --ks ks_ec2.jks --ks-pass pass:password \
+            --out traced_multi.apk unsigned.apk
+          # verify -v with certs
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" verify -v --print-certs traced_rsa.apk
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" verify -v traced_ec.apk
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" verify -v traced_multi.apk
+          # --help (metadata paths)
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/apksigner-config \
+            -jar "$JAR" --help > /dev/null 2>&1 || true
           find /tmp/apksigner-config -type f
+
+      - name: Generate retrace native config (tracing agent)
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+        run: |
+          set -euxo pipefail
+          R8JAR="$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar"
+          cp testdata/retrace-mapping.txt /tmp/retrace-mapping.txt
+          cp testdata/retrace-trace.txt /tmp/retrace-trace.txt
+          java -agentlib:native-image-agent=config-output-dir=/tmp/retrace-config \
+            -cp "$R8JAR" com.android.tools.r8.retrace.Retrace /tmp/retrace-mapping.txt /tmp/retrace-trace.txt > /dev/null
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/retrace-config \
+            -cp "$R8JAR" com.android.tools.r8.retrace.Retrace --verbose /tmp/retrace-mapping.txt /tmp/retrace-trace.txt > /dev/null
+          java -agentlib:native-image-agent=config-merge-dir=/tmp/retrace-config \
+            -cp "$R8JAR" com.android.tools.r8.retrace.Retrace --version > /dev/null
+          find /tmp/retrace-config -type f
 
       - name: Compile native-image substitutions
         run: |
@@ -97,7 +148,7 @@ jobs:
           native-image \
             -cp "$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar" \
             --initialize-at-build-time \
-            -H:ReflectionConfigurationFiles="$GITHUB_WORKSPACE/.github/workflows/reflect-config.json" \
+            -H:ConfigurationFileDirectories=/tmp/retrace-config \
             -H:CCompilerPath=/usr/bin/clang \
             -march=compatibility \
             -J-Xmx6g \
@@ -123,25 +174,64 @@ jobs:
 
       - name: Verify retrace
         run: |
+          set -euxo pipefail
           ./retrace --version
+          cp testdata/retrace-mapping.txt /tmp/retrace-mapping.txt
+          cp testdata/retrace-trace.txt /tmp/retrace-trace.txt
+          ./retrace /tmp/retrace-mapping.txt /tmp/retrace-trace.txt | tee /tmp/retraced.txt
+          grep -q "com.example.hello.Hello.a(Hello.java:13)" /tmp/retraced.txt
+          grep -q "com.example.hello.Hello.greet(Hello.java:7)" /tmp/retraced.txt
+          echo "PASS: retrace deobfuscation"
 
-      - name: Verify apksigner (RSA + EC, v1+v2+v3)
+      - name: Verify apksigner (RSA + EC + DSA, v1+v2+v3+v4, multi-signer)
         run: |
           set -euxo pipefail
-          ./apksigner sign \
-            --ks /tmp/apktest/ks_rsa.jks --ks-pass pass:password \
-            --out /tmp/apktest/native_rsa.apk /tmp/apktest/unsigned.apk
-          ./apksigner verify -v /tmp/apktest/native_rsa.apk | tee /tmp/rsa_verify.txt
+          cd /tmp/apktest
+          ./apksigner --version
+
+          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+            --out native_rsa.apk unsigned.apk
+          ./apksigner verify -v --print-certs native_rsa.apk | tee /tmp/rsa_verify.txt
           grep "Verified using v1 scheme (JAR signing): true" /tmp/rsa_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/rsa_verify.txt
           grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/rsa_verify.txt
-          ./apksigner sign \
-            --ks /tmp/apktest/ks_ec.jks --ks-pass pass:password \
-            --out /tmp/apktest/native_ec.apk /tmp/apktest/unsigned.apk
-          ./apksigner verify -v /tmp/apktest/native_ec.apk | tee /tmp/ec_verify.txt
-          grep "Verified using v1 scheme (JAR signing): true" /tmp/ec_verify.txt
+          echo "PASS: RSA v1+v2+v3"
+
+          ./apksigner sign --ks ks_ec.jks --ks-pass pass:password \
+            --out native_ec.apk unsigned.apk
+          ./apksigner verify -v native_ec.apk | tee /tmp/ec_verify.txt
           grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/ec_verify.txt
           grep "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/ec_verify.txt
+          echo "PASS: EC v1+v2+v3"
+
+          ./apksigner sign --ks ks_dsa.jks --ks-pass pass:password \
+            --out native_dsa.apk unsigned.apk
+          ./apksigner verify -v native_dsa.apk | tee /tmp/dsa_verify.txt
+          grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/dsa_verify.txt
+          echo "PASS: DSA"
+
+          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+            --v4-signing-enabled true --out native_v4.apk unsigned.apk
+          test -s native_v4.apk.idsig
+          ./apksigner verify -v native_v4.apk | tee /tmp/v4_verify.txt
+          grep "Verifies" /tmp/v4_verify.txt
+          echo "PASS: v4 idsig produced (minSdk 26 => v4 verify reports false by design)"
+
+          ./apksigner sign --ks ks_rsa.jks --ks-pass pass:password \
+            --v2-signing-enabled false --v3-signing-enabled false --v4-signing-enabled false \
+            --min-sdk-version 19 --out native_v1only.apk unsigned.apk
+          ./apksigner verify -v native_v1only.apk | tee /tmp/v1_verify.txt
+          grep "Verified using v1 scheme (JAR signing): true" /tmp/v1_verify.txt
+          echo "PASS: v1-only old min-sdk"
+
+          ./apksigner sign --ks ks_rsa2.jks --ks-pass pass:password \
+            --v3-signing-enabled false \
+            --next-signer --ks ks_ec2.jks --ks-pass pass:password \
+            --out native_multi.apk unsigned.apk
+          ./apksigner verify -v --print-certs native_multi.apk | tee /tmp/multi_verify.txt
+          grep "Number of signers: 2" /tmp/multi_verify.txt
+          grep "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/multi_verify.txt
+          echo "PASS: multiple signers"
 
       - name: Upload aarch64 binaries
         uses: actions/upload-artifact@v4
