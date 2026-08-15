@@ -176,7 +176,9 @@ jobs:
         run: |
           set -euxo pipefail
           /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
-            -cp /tmp/compose-runtime.jar -d /tmp/ktwork/verify-compose.jar \
+            -cp /tmp/compose-runtime.jar \
+            -Xplugin=/tmp/kotlinc/lib/compose-compiler-plugin.jar \
+            -d /tmp/ktwork/verify-compose.jar \
             /tmp/ktwork/Compose.kt -nowarn
           if "$JAVA_HOME/bin/javap" -classpath /tmp/ktwork/verify-compose.jar -p \
               com.example.sample.ComposeKt | grep -q Composer; then
