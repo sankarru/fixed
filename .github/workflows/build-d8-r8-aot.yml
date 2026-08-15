@@ -84,8 +84,10 @@ jobs:
           R8JAR="$ANDROID_HOME/cmdline-tools/latest/lib/r8.jar"
           ANDROID_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
           if [ ! -f "$ANDROID_JAR" ]; then
+            set +o pipefail
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
               --sdk_root="$ANDROID_HOME" "platforms;android-36"
+            set -o pipefail
           fi
           mkdir -p /tmp/d8r8-config /tmp/d8r8-scratch
           cd /tmp/d8r8-scratch
