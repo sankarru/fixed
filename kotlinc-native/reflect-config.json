@@ -1,6 +1,6 @@
 [
   {
-    "type": "org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments",
+    "name": "org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments",
     "methods": [
       {
         "name": "setClasspath",
@@ -41,7 +41,7 @@
     ]
   },
   {
-    "type": "org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments",
+    "name": "org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments",
     "methods": [
       {
         "name": "setPluginClasspaths",
