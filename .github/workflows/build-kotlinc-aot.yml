@@ -88,7 +88,7 @@ jobs:
             -H:+AllowJRTFileSystem \
             -H:+AddAllCharsets \
             --future-defaults=run-time-initialize-file-system-providers \
-            --initialize-at-run-time=org.jetbrains.kotlin,com.intellij,org.fusesource,jdk.internal.jrtfs,jdk.internal.jimage \
+            --initialize-at-run-time=org.jetbrains.kotlin,com.intellij,org.fusesource,jdk.internal.jrtfs.SystemImage,jdk.internal.jrtfs,jdk.internal.jimage \
             -march=compatibility \
             -J-Xmx10g \
             -H:+ReportExceptionStackTraces \
@@ -102,6 +102,15 @@ jobs:
           /tmp/kotlinc/kotlinc -Dkotlin.home=/tmp/kotlinc -Djava.home="$JAVA_HOME" \
             /tmp/ktwork/Main.kt -d /tmp/ktwork/verify.jar -nowarn
           java -cp /tmp/ktwork/verify.jar MainKt
+
+      - name: Check no build-time java.home is baked
+        run: |
+          set -euxo pipefail
+          if strings /tmp/kotlinc/kotlinc | grep -q hostedtoolcache; then
+            echo "FAIL: baked build-time java.home present in binary"
+            exit 1
+          fi
+          echo "PASS: no baked java.home in binary"
 
       - name: Upload aarch64 binary
         uses: actions/upload-artifact@v4
